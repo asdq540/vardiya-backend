@@ -44,8 +44,12 @@ def kaydet():
             return jsonify({"hata": "Lütfen tüm alanları doldurun"}), 400
 
         ws = get_sheet()  # Burada hata çıkabilir
+        for aciklama in data.get("aciklamalar", []):
+    if aciklama.strip():  # boş değilse
         ws.append_row([tarih, vardiya, hat, aciklama, personel])
-        return jsonify({"mesaj": "Veri Google Sheets'e kaydedildi!"})
+
+
+        return jsonify({"mesaj": "Gönderildi!"})
 
     except Exception as e:
         print("HATA:", str(e))  # Terminalde görünür
