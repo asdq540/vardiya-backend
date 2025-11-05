@@ -23,7 +23,8 @@ def get_sheet():
         raise Exception("SPREADSHEET_ID tanımlı değil.")
     
     sh = client.open_by_key(spreadsheet_id)
-    return sh.sayfa1
+    return sh.worksheet("Sayfa1")  # veya Google Sheet’teki sekme adı
+
 
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
