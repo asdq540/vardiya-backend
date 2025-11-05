@@ -4,10 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 import os
-
 from dotenv import load_dotenv
-load_dotenv()
 
+# .env dosyasını yükle
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -27,7 +27,7 @@ def get_sheet():
         raise Exception("SPREADSHEET_ID tanımlı değil.")
     
     sh = client.open_by_key(spreadsheet_id)
-    return sh.worksheet("Sayfa1")  # veya Google Sheet’teki sekme adı
+    return sh.worksheet("Sayfa1")  # Sekme adın buysa değiştirmen gerekmez
 
 
 @app.route("/api/kaydet", methods=["POST"])
@@ -37,26 +37,28 @@ def kaydet():
         tarih = data.get("tarih")
         vardiya = data.get("vardiya")
         hat = data.get("hat")
-        aciklama = data.get("aciklama")
-        personel = data.get("personel")
+        aciklamalar = data.get("aciklamalar", [])
 
-        if not all([tarih, vardiya, hat, aciklama, personel]):
-            return jsonify({"hata": "Lütfen tüm alanları doldurun"}), 400
+        if not all([tarih, vardiya, hat]):
+            return jsonify({"hata": "Tarih, vardiya ve hat zorunludur"}), 400
 
-        ws = get_sheet()  # Burada hata çıkabilir
-        for aciklama in data.get("aciklamalar", []):
-    if aciklama.strip():  # boş değilse
-        ws.append_row([tarih, vardiya, hat, aciklama, personel])
+        ws = get_sheet()
 
+        for a in aciklamalar:
+            aciklama = a.get("aciklama", "").strip()
+            personel = a.get("personel", "").strip()
 
-        return jsonify({"mesaj": "Gönderildi!"})
+            # Sadece açıklama varsa kaydet
+            if aciklama:
+                ws.append_row([tarih, vardiya, hat, aciklama, personel])
+
+        return jsonify({"mesaj": "Veriler Google Sheets'e kaydedildi!"})
 
     except Exception as e:
-        print("HATA:", str(e))  # Terminalde görünür
+        print("HATA:", str(e))
         return jsonify({"hata": str(e)}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-
