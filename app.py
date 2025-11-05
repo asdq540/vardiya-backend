@@ -23,7 +23,7 @@ def get_sheet():
         raise Exception("SPREADSHEET_ID tanımlı değil.")
     
     sh = client.open_by_key(spreadsheet_id)
-    return sh.sheet1
+    return sh.sayfa1
 
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
