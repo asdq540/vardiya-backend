@@ -2,79 +2,93 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
-import requests
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import io
 import json
 import os
-from dotenv import load_dotenv
-import base64
-
-load_dotenv()
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+# 🔹 Hem Sheets hem Drive yetkileri
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file"
+]
 
-def get_sheet():
+def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
         raise Exception("Google Sheets kimlik bilgisi eksik.")
     creds_dict = json.loads(creds_json)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    client = gspread.authorize(creds)
+    return creds
 
+def get_sheet():
+    creds = get_creds()
+    client = gspread.authorize(creds)
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
-    if not spreadsheet_id:
-        raise Exception("SPREADSHEET_ID tanımlı değil.")
-    
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-def upload_image_to_imgbb(image_base64):
-    imgbb_key = os.environ.get("IMGBB_API_KEY")
-    if not imgbb_key:
-        raise Exception("IMGBB_API_KEY eksik.")
-    url = "https://api.imgbb.com/1/upload"
-    payload = {"key": imgbb_key, "image": image_base64}
-    response = requests.post(url, data=payload)
-    result = response.json()
-    return result["data"]["url"]
+def upload_to_drive(file):
+    creds = get_creds()
+    drive_service = build("drive", "v3", credentials=creds)
+
+    file_metadata = {
+        "name": f"vardiya_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}",
+        "parents": []  # dilersen Drive'da özel klasör ID’si koyabilirsin
+    }
+
+    media = MediaIoBaseUpload(io.BytesIO(file.read()), mimetype=file.mimetype)
+    uploaded_file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id"
+    ).execute()
+
+    file_id = uploaded_file.get("id")
+
+    # Dosyayı herkese görünür yap
+    drive_service.permissions().create(
+        fileId=file_id,
+        body={"role": "reader", "type": "anyone"}
+    ).execute()
+
+    return f"https://drive.google.com/file/d/{file_id}/view"
 
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
-        data = request.get_json()
-        tarih = data.get("tarih")
-        vardiya = data.get("vardiya")
-        hat = data.get("hat")
-        aciklamalar = data.get("aciklamalar", [])
+        tarih = request.form.get("tarih")
+        vardiya = request.form.get("vardiya")
+        hat = request.form.get("hat")
+        aciklamalar = json.loads(request.form.get("aciklamalar", "[]"))
 
-        if not all([tarih, vardiya, hat]):
-            return jsonify({"hata": "Tarih, vardiya ve hat zorunludur"}), 400
+        if not tarih or not vardiya or not hat:
+            return jsonify({"hata": "Lütfen temel alanları doldurun"}), 400
 
         ws = get_sheet()
 
-        for a in aciklamalar:
-            aciklama = a.get("aciklama", "").strip()
-            personel = a.get("personel", "").strip()
-            image_base64 = a.get("foto")
+        # Her açıklama + personel için ayrı satır
+        for i, item in enumerate(aciklamalar):
+            aciklama = item.get("aciklama", "")
+            personel = item.get("personel", "")
+            file = request.files.get(f"foto{i}")
+            link = ""
+            if file:
+                link = upload_to_drive(file)
 
-            if aciklama:
-                photo_url = ""
-                if image_base64:
-                    try:
-                        photo_url = upload_image_to_imgbb(image_base64)
-                    except Exception as e:
-                        print("Fotoğraf yüklenemedi:", e)
-                        photo_url = "Yüklenemedi"
+            ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
 
-                ws.append_row([tarih, vardiya, hat, aciklama, personel, photo_url])
-
-        return jsonify({"mesaj": "Veriler Google Sheets'e kaydedildi!"})
+        return jsonify({"mesaj": "Veriler Google Sheets ve Drive'a kaydedildi!"})
 
     except Exception as e:
-        print("HATA:", str(e))
+        print("HATA:", e)
         return jsonify({"hata": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
