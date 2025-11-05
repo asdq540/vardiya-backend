@@ -17,27 +17,28 @@ def get_sheet():
     creds_dict = json.loads(creds_json)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
+
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
     if not spreadsheet_id:
         raise Exception("SPREADSHEET_ID tanımlı değil.")
+    
     sh = client.open_by_key(spreadsheet_id)
     return sh.sheet1
 
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
-    data = request.get_json()
-    tarih = data.get("tarih")
-    vardiya = data.get("vardiya")
-    hat = data.get("hat")
-    aciklama = data.get("aciklama")
-    personel = data.get("personel")
+    try:
+        data = request.get_json()
+        if not all([data.get("tarih"), data.get("vardiya"), data.get("hat"), data.get("aciklama"), data.get("personel")]):
+            return jsonify({"hata": "Lütfen tüm alanları doldurun"}), 400
 
-    if not all([tarih, vardiya, hat, aciklama, personel]):
-        return jsonify({"hata": "Lütfen tüm alanları doldurun"}), 400
+        ws = get_sheet()
+        ws.append_row([data["tarih"], data["vardiya"], data["hat"], data["aciklama"], data["personel"]])
+        return jsonify({"mesaj": "Veri Google Sheets'e kaydedildi!"})
 
-    ws = get_sheet()
-    ws.append_row([tarih, vardiya, hat, aciklama, personel])
-    return jsonify({"mesaj": "Veri Google Sheets'e kaydedildi!"})
+    except Exception as e:
+        return jsonify({"hata": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
