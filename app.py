@@ -30,15 +30,23 @@ def get_sheet():
 def kaydet():
     try:
         data = request.get_json()
-        if not all([data.get("tarih"), data.get("vardiya"), data.get("hat"), data.get("aciklama"), data.get("personel")]):
+        tarih = data.get("tarih")
+        vardiya = data.get("vardiya")
+        hat = data.get("hat")
+        aciklama = data.get("aciklama")
+        personel = data.get("personel")
+
+        if not all([tarih, vardiya, hat, aciklama, personel]):
             return jsonify({"hata": "Lütfen tüm alanları doldurun"}), 400
 
-        ws = get_sheet()
-        ws.append_row([data["tarih"], data["vardiya"], data["hat"], data["aciklama"], data["personel"]])
+        ws = get_sheet()  # Burada hata çıkabilir
+        ws.append_row([tarih, vardiya, hat, aciklama, personel])
         return jsonify({"mesaj": "Veri Google Sheets'e kaydedildi!"})
 
     except Exception as e:
+        print("HATA:", str(e))  # Terminalde görünür
         return jsonify({"hata": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
