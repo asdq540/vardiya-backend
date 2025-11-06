@@ -71,15 +71,21 @@ def kaydet():
 
         ws = get_sheet()
 
-        for i, item in enumerate(aciklamalar):
-            aciklama = item.get("aciklama", "")
-            personel = item.get("personel", "")
-            file = request.files.get(f"foto{i}")
-            link = ""
-            if file:
-                link = upload_to_drive(file)
+       for i, item in enumerate(aciklamalar):
+    aciklama = item.get("aciklama", "").strip()
+    personel = item.get("personel", "").strip()
 
-            ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
+    # Eğer hem açıklama hem personel boşsa bu satırı atla
+    if not aciklama and not personel:
+        continue
+
+    file = request.files.get(f"foto{i}")
+    link = ""
+    if file and file.filename:
+        link = upload_to_drive(file)
+
+    ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
+
 
         return jsonify({"mesaj": "Veriler Google Sheets ve Drive'a kaydedildi!"})
 
