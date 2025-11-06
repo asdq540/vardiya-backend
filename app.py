@@ -56,7 +56,13 @@ def upload_to_drive(file):
 
     return f"https://drive.google.com/file/d/{file_id}/view"
 
+
 @app.route("/api/kaydet", methods=["POST"])
+def kaydet():
+    try:
+        print("🔹 request.form içeriği:", request.form.to_dict())
+        print("🔹 request.files anahtarları:", list(request.files.keys()))
+
 def kaydet():
     try:
         tarih = request.form.get("tarih")
