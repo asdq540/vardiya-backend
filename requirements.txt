@@ -4,3 +4,4 @@ gspread
 google-auth
 gunicorn
 python-dotenv
+google-api-python-client==2.154.0
