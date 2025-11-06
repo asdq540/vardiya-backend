@@ -18,6 +18,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file"
 ]
 
+# 🔹 Kimlik bilgilerini ortam değişkeninden al
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -26,6 +27,7 @@ def get_creds():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return creds
 
+# 🔹 Google Sheet'e bağlan
 def get_sheet():
     creds = get_creds()
     client = gspread.authorize(creds)
@@ -33,6 +35,7 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
+# 🔹 Dosyayı Google Drive'a yükle
 def upload_to_drive(file):
     creds = get_creds()
     drive_service = build("drive", "v3", credentials=creds)
@@ -58,34 +61,42 @@ def upload_to_drive(file):
 
     return f"https://drive.google.com/file/d/{file_id}/view"
 
+# 🔹 Ana kayıt API'si
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
         tarih = request.form.get("tarih")
         vardiya = request.form.get("vardiya")
         hat = request.form.get("hat")
-        aciklamalar = json.loads(request.form.get("aciklamalar", "[]"))
+        aciklamalar_raw = request.form.get("aciklamalar", "[]")
+
+        # JSON düzgün değilse hata vermesin
+        try:
+            aciklamalar = json.loads(aciklamalar_raw)
+        except json.JSONDecodeError:
+            aciklamalar = []
 
         if not tarih or not vardiya or not hat:
             return jsonify({"hata": "Lütfen temel alanları doldurun"}), 400
 
         ws = get_sheet()
 
-       for i, item in enumerate(aciklamalar):
-    aciklama = item.get("aciklama", "").strip()
-    personel = item.get("personel", "").strip()
+        # 🔸 Boş açıklama satırlarını atla
+        for i, item in enumerate(aciklamalar):
+            aciklama = item.get("aciklama", "").strip()
+            personel = item.get("personel", "").strip()
 
-    # Eğer hem açıklama hem personel boşsa bu satırı atla
-    if not aciklama and not personel:
-        continue
+            # Eğer hem açıklama hem personel boşsa bu satırı atla
+            if not aciklama and not personel:
+                continue
 
-    file = request.files.get(f"foto{i}")
-    link = ""
-    if file and file.filename:
-        link = upload_to_drive(file)
+            file = request.files.get(f"foto{i}")
+            link = ""
+            if file and file.filename:
+                link = upload_to_drive(file)
 
-    ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
-
+            # Google Sheets'e ekle
+            ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
 
         return jsonify({"mesaj": "Veriler Google Sheets ve Drive'a kaydedildi!"})
 
