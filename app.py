@@ -12,7 +12,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# Google API izin kapsamları
+# 🔹 Google Sheets ve Drive yetkileri
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file"
@@ -23,13 +23,15 @@ def get_creds():
     if not creds_json:
         raise Exception("Google Sheets kimlik bilgisi eksik.")
     creds_dict = json.loads(creds_json)
-    return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    return creds
 
 def get_sheet():
     creds = get_creds()
     client = gspread.authorize(creds)
     spreadsheet_id = os.environ.get("SPREADSHEET_ID")
-    return client.open_by_key(spreadsheet_id).worksheet("Sayfa1")
+    sh = client.open_by_key(spreadsheet_id)
+    return sh.worksheet("Sayfa1")
 
 def upload_to_drive(file):
     creds = get_creds()
@@ -40,15 +42,15 @@ def upload_to_drive(file):
     }
 
     media = MediaIoBaseUpload(io.BytesIO(file.read()), mimetype=file.mimetype)
-    uploaded = drive_service.files().create(
+    uploaded_file = drive_service.files().create(
         body=file_metadata,
         media_body=media,
         fields="id"
     ).execute()
 
-    file_id = uploaded.get("id")
+    file_id = uploaded_file.get("id")
 
-    # Dosyayı herkese açık yap
+    # Dosyayı herkese görünür yap
     drive_service.permissions().create(
         fileId=file_id,
         body={"role": "reader", "type": "anyone"}
@@ -56,38 +58,26 @@ def upload_to_drive(file):
 
     return f"https://drive.google.com/file/d/{file_id}/view"
 
-
 @app.route("/api/kaydet", methods=["POST"])
-def kaydet():
-    try:
-        print("🔹 request.form içeriği:", request.form.to_dict())
-        print("🔹 request.files anahtarları:", list(request.files.keys()))
-
 def kaydet():
     try:
         tarih = request.form.get("tarih")
         vardiya = request.form.get("vardiya")
         hat = request.form.get("hat")
-        aciklamalar_raw = request.form.get("aciklamalar", "[]")
+        aciklamalar = json.loads(request.form.get("aciklamalar", "[]"))
 
         if not tarih or not vardiya or not hat:
             return jsonify({"hata": "Lütfen temel alanları doldurun"}), 400
-
-        try:
-            aciklamalar = json.loads(aciklamalar_raw)
-        except json.JSONDecodeError:
-            aciklamalar = []
 
         ws = get_sheet()
 
         for i, item in enumerate(aciklamalar):
             aciklama = item.get("aciklama", "")
             personel = item.get("personel", "")
-            foto = request.files.get(f"foto{i}")
+            file = request.files.get(f"foto{i}")
             link = ""
-
-            if foto and foto.filename:
-                link = upload_to_drive(foto)
+            if file:
+                link = upload_to_drive(file)
 
             ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
 
@@ -96,6 +86,7 @@ def kaydet():
     except Exception as e:
         print("HATA:", e)
         return jsonify({"hata": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
