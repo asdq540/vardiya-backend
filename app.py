@@ -16,7 +16,7 @@ CORS(app)
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/drive"
+    "https://drive.google.com/drive/folders"
 ]
 
 # 🔐 Kimlik doğrulama
