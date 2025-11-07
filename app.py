@@ -3,21 +3,23 @@ from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaInMemoryUpload
+from googleapiclient.http import MediaIoBaseUpload
+import io
 import json
 import os
 import base64
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)  # ✅ CORS aktif
+CORS(app)
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# 🔐 Google kimlik bilgileri
+# 🔐 Kimlik doğrulama
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -25,7 +27,7 @@ def get_creds():
     creds_dict = json.loads(creds_json)
     return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 
-# 📄 Google Sheet bağlantısı
+# 📄 Sheet erişimi
 def get_sheet():
     creds = get_creds()
     client = gspread.authorize(creds)
@@ -33,38 +35,43 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# ☁️ Google Drive’a yükleme
+# ☁️ Google Drive’a base64 resmi yükle
 def upload_to_drive(base64_data, file_name):
-    creds = get_creds()
-    drive_service = build("drive", "v3", credentials=creds)
+    try:
+        creds = get_creds()
+        drive_service = build("drive", "v3", credentials=creds)
 
-    # Base64 verisini decode et
-    file_bytes = base64.b64decode(base64_data.split(",")[1])
-    media = MediaInMemoryUpload(file_bytes, mimetype="image/jpeg")
+        # base64 içeriğini decode et (data:image/jpeg;base64, kısmını atla)
+        if "," in base64_data:
+            base64_data = base64_data.split(",")[1]
+        file_bytes = base64.b64decode(base64_data)
+        file_stream = io.BytesIO(file_bytes)
 
-    folder_id = "1xmFTBMmKCjm2cKEAA1NipufHjFnWXsLd"  # senin klasörün
+        media = MediaIoBaseUpload(file_stream, mimetype="image/jpeg")
 
-    # Dosyayı Drive’a yükle
-    file_metadata = {
-        "name": file_name,
-        "parents": [folder_id]
-    }
-    file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id"
-    ).execute()
+        folder_id = "1xmFTBMmKCjm2cKEAA1NipufHjFnWXsLd"  # senin Drive klasör ID'si
+        file_metadata = {"name": file_name, "parents": [folder_id]}
 
-    file_id = file.get("id")
+        uploaded = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
 
-    # Paylaşımı aç (herkes bağlantıyla görüntüleyebilsin)
-    drive_service.permissions().create(
-        fileId=file_id,
-        body={"type": "anyone", "role": "reader"},
-    ).execute()
+        file_id = uploaded.get("id")
 
-    # Paylaşılabilir link oluştur
-    return f"https://drive.google.com/uc?id={file_id}"
+        # herkese açık görüntüleme izni ver
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+        ).execute()
+
+        # Görüntüleme linki oluştur
+        return f"https://drive.google.com/uc?id={file_id}"
+
+    except Exception as e:
+        print("🚨 Google Drive yükleme hatası:", e)
+        return ""
 
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
@@ -81,14 +88,16 @@ def kaydet():
         for idx, item in enumerate(aciklamalar, start=1):
             aciklama = item.get("aciklama", "").strip()
             personel = item.get("personel", "").strip()
-            foto = item.get("foto")  # base64 string
+            foto = item.get("foto", "").strip()
 
             if not (aciklama or personel or foto):
                 continue
 
             foto_url = ""
             if foto and foto.startswith("data:image"):
-                file_name = f"{tarih}_{vardiya}_{hat}_foto_{idx}.jpg"
+                # Dosya ismini oluştur
+                safe_tarih = tarih.replace("/", "-").replace(":", "-")
+                file_name = f"{safe_tarih}_{vardiya}_{hat}_foto_{idx}.jpg"
                 foto_url = upload_to_drive(foto, file_name)
 
             rows_to_add.append([tarih, vardiya, hat, aciklama, personel, foto_url])
@@ -98,10 +107,13 @@ def kaydet():
 
         ws.append_rows(rows_to_add, value_input_option="RAW")
 
-        return jsonify({"mesaj": f"{len(rows_to_add)} satır başarıyla eklendi!"}), 200
+        return jsonify({
+            "mesaj": f"{len(rows_to_add)} satır başarıyla eklendi!",
+            "veri": rows_to_add
+        }), 200
 
     except Exception as e:
-        print("Sheets veya Drive Hatası:", e)
+        print("🚨 Genel hata:", e)
         return jsonify({"hata": str(e)}), 500
 
 
