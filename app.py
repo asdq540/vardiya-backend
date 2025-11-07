@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)  # ✅ Vercel'den gelen istekleri kabul et
+CORS(app)  # ✅ Vercel veya frontend'den gelen istekleri kabul et
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -35,12 +35,25 @@ def kaydet():
         aciklamalar = data.get("aciklamalar", [])
 
         ws = get_sheet()
-        for item in aciklamalar:
-            aciklama = item.get("aciklama", "")
-            personel = item.get("personel", "")
-            ws.append_row([tarih, vardiya, hat, aciklama, personel])
+        rows_to_add = []
 
-        return jsonify({"mesaj": "Veriler başarıyla eklendi!"}), 200
+        # ✅ Sadece dolu verileri al
+        for item in aciklamalar:
+            aciklama = item.get("aciklama", "").strip()
+            personel = item.get("personel", "").strip()
+
+            # Boş veya "Yok" olanları atla
+            if aciklama and aciklama.lower() != "yok":
+                rows_to_add.append([tarih, vardiya, hat, aciklama, personel])
+
+        if not rows_to_add:
+            return jsonify({"mesaj": "Eklenebilecek veri bulunamadı."}), 400
+
+        # ✅ Tüm satırları tek seferde ekle
+        ws.append_rows(rows_to_add, value_input_option="RAW")
+
+        return jsonify({"mesaj": f"{len(rows_to_add)} satır başarıyla eklendi!"}), 200
+
     except Exception as e:
         print("Sheets Hatası:", e)
         return jsonify({"hata": str(e)}), 500
