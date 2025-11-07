@@ -65,38 +65,35 @@ def upload_to_drive(file):
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
-        tarih = request.form.get("tarih")
-        vardiya = request.form.get("vardiya")
-        hat = request.form.get("hat")
+        tarih = request.form.get("tarih", "")
+        vardiya = request.form.get("vardiya", "")
+        hat = request.form.get("hat", "")
         aciklamalar_raw = request.form.get("aciklamalar", "[]")
 
-        # JSON düzgün değilse hata vermesin
         try:
             aciklamalar = json.loads(aciklamalar_raw)
         except json.JSONDecodeError:
             aciklamalar = []
 
-        if not tarih or not vardiya or not hat:
-            return jsonify({"hata": "Lütfen temel alanları doldurun"}), 400
-
         ws = get_sheet()
+        kayit_sayisi = 0
 
-        # 🔸 Boş açıklama satırlarını atla
+        # 🔸 Her açıklama satırı için kayıt yap
         for i, item in enumerate(aciklamalar):
             aciklama = item.get("aciklama", "").strip()
             personel = item.get("personel", "").strip()
-
-            # Eğer hem açıklama hem personel boşsa bu satırı atla
-            if not aciklama and not personel:
-                continue
-
             file = request.files.get(f"foto{i}")
             link = ""
+
             if file and file.filename:
                 link = upload_to_drive(file)
 
-            # Google Sheets'e ekle
             ws.append_row([tarih, vardiya, hat, aciklama, personel, link])
+            kayit_sayisi += 1
+
+        # 🔸 Eğer hiç açıklama yoksa boş bir satır ekle (isteğe bağlı)
+        if kayit_sayisi == 0:
+            ws.append_row([tarih, vardiya, hat, "", "", ""])
 
         return jsonify({"mesaj": "Veriler Google Sheets ve Drive'a kaydedildi!"})
 
