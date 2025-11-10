@@ -7,11 +7,12 @@ import os
 import base64
 import requests
 import traceback
+import time  # <-- benzersiz isim için ekledik
 
 app = Flask(__name__)
-CORS(app)  # Frontend'den gelen isteklere izin ver
+CORS(app)
 
-# Google Sheets yetkileri
+# Google API yetki alanları
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 def get_creds():
@@ -30,7 +31,6 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# ImgBB yükleme fonksiyonu (debug loglu)
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -38,16 +38,10 @@ def upload_to_imgbb(base64_data, file_name):
             raise Exception("IMGBB_API_KEY bulunamadı.")
 
         if not base64_data.startswith("data:image"):
-            print("⚠️ Geçersiz resim formatı:", base64_data[:30])
+            print("⚠️ Geçersiz resim formatı atlandı.")
             return None
 
-        if "," not in base64_data:
-            print("⚠️ Base64 verisi hatalı:", base64_data[:50])
-            return None
-
-        # Sadece base64 kısmını al
         image_bytes = base64_data.split(",")[1]
-        print(f"📌 Upload: {file_name}, Base64 uzunluğu: {len(image_bytes)}")
 
         payload = {
             "key": api_key,
@@ -61,9 +55,7 @@ def upload_to_imgbb(base64_data, file_name):
 
         data = response.json()
         if data.get("success"):
-            file_url = data["data"]["url"]
-            print(f"✅ Fotoğraf yüklendi: {file_url}")
-            return file_url
+            return data["data"]["url"]
         else:
             print("🚨 ImgBB Error:", data.get("error", {}).get("message"))
             return None
@@ -73,7 +65,6 @@ def upload_to_imgbb(base64_data, file_name):
         traceback.print_exc()
         return None
 
-# API: Google Sheets’e veri kaydet
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
@@ -93,7 +84,8 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}"
+                timestamp = int(time.time() * 1000)  # milisaniye damgası
+                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{timestamp}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
             if aciklama or personel or foto_url:
@@ -104,10 +96,10 @@ def kaydet():
 
         return jsonify({"mesaj": "Veriler başarıyla eklendi!"}), 200
 
-    except Exception:
+    except Exception as e:
         print("❌ Genel hata:")
         traceback.print_exc()
-        return jsonify({"hata": "Sunucu hatası"}), 500
+        return jsonify({"hata": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
