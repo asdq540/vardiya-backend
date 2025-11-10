@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
-import io
 import json
 import os
 import base64
@@ -40,29 +39,27 @@ def upload_to_imgbb(base64_data, file_name):
         if not api_key:
             raise Exception("IMGBB_API_KEY bulunamadı.")
 
-        if not base64_data.startswith("data:image"):
-            print("⚠️ Geçersiz resim formatı atlandı.")
+        if "," not in base64_data:
+            print("⚠️ Base64 format hatası:", base64_data[:30])
             return None
 
-        image_bytes = base64_data.split(",")[1]  # "data:image/jpeg;base64,..."
-        payload = {
-            "key": api_key,
-            "image": image_bytes,
-            "name": file_name
-        }
+        image_bytes = base64_data.split(",")[1]  # sadece saf base64
 
-        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
-        data = response.json()
+        files = {"image": image_bytes}
+        data = {"key": api_key, "name": file_name}
 
-        if data["success"]:
-            file_url = data["data"]["url"]  # veya display_url
+        response = requests.post("https://api.imgbb.com/1/upload", files=files, data=data)
+        result = response.json()
+
+        if result.get("success"):
+            file_url = result["data"]["url"]
             print(f"✅ Fotoğraf yüklendi: {file_url}")
             return file_url
         else:
-            print("🚨 ImgBB Upload Error:", data["error"]["message"])
+            print("🚨 ImgBB Upload Error:", result.get("error", {}).get("message"))
             return None
 
-    except Exception as e:
+    except Exception:
         print("🚨 Fotoğraf yüklenemedi:")
         traceback.print_exc()
         return None
@@ -90,7 +87,6 @@ def kaydet():
                 file_name = f"{tarih}_{vardiya}_{hat}_{i+1}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
-            # Boş olmayan satırları ekle
             if aciklama or personel or foto_url:
                 rows_to_add.append([tarih, vardiya, hat, aciklama, personel, foto_url])
 
