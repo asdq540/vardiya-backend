@@ -42,7 +42,6 @@ def upload_to_imgbb(base64_data, file_name):
             print("⚠️ Geçersiz resim formatı atlandı.")
             return None
 
-        # Saf base64 al
         if "," not in base64_data:
             print("⚠️ Base64 verisi hatalı:", base64_data[:50])
             return None
@@ -62,7 +61,7 @@ def upload_to_imgbb(base64_data, file_name):
         print("Response text:", response.text)
 
         data = response.json()
-        if data["success"]:
+        if data.get("success"):
             file_url = data["data"]["url"]
             print(f"✅ Fotoğraf yüklendi: {file_url}")
             return file_url
@@ -70,10 +69,11 @@ def upload_to_imgbb(base64_data, file_name):
             print("🚨 ImgBB Error:", data.get("error", {}).get("message"))
             return None
 
-    except Exception as e:
+    except Exception:
         print("🚨 Fotoğraf yüklenemedi:")
         traceback.print_exc()
         return None
+
 
 
 # 📥 API: Sheets'e verileri kaydet
