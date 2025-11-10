@@ -2,19 +2,14 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
-import json
-import os
-import base64
-import requests
-import traceback
-import uuid
+import os, json, traceback, requests
 
 app = Flask(__name__)
 CORS(app)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Google Sheets yetkisi
+# Google Sheets kimlik doğrulama
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -31,6 +26,7 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
+# ImgBB yükleme
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -41,38 +37,25 @@ def upload_to_imgbb(base64_data, file_name):
             print("⚠️ Geçersiz resim formatı atlandı.")
             return None
 
-        if "," not in base64_data:
-            print("⚠️ Base64 verisi hatalı:", base64_data[:50])
-            return None
-
         image_bytes = base64_data.split(",")[1]
-
-        # Benzersiz isim: file_name + uuid4
-        unique_name = f"{file_name}_{uuid.uuid4().hex}"
-
         payload = {
             "key": api_key,
             "image": image_bytes,
-            "name": unique_name
+            "name": file_name
         }
-
         response = requests.post("https://api.imgbb.com/1/upload", data=payload)
-        print("Status code:", response.status_code)
-        print("Response text:", response.text)
-
         data = response.json()
         if data.get("success"):
-            file_url = data["data"]["url"]
-            return file_url
+            return data["data"]["url"]
         else:
-            print("🚨 ImgBB Error:", data.get("error", {}).get("message"))
+            print("🚨 ImgBB Error:", data.get("error"))
             return None
-
     except Exception:
         print("🚨 Fotoğraf yüklenemedi:")
         traceback.print_exc()
         return None
 
+# API endpoint: veri kaydet
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
@@ -92,7 +75,8 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}"
+                # benzersiz isim: tarih_vardiya_hat_index_random
+                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{int(os.times()[4]*1000)}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
             if aciklama or personel or foto_url:
