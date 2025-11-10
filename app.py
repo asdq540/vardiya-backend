@@ -11,10 +11,9 @@ import traceback
 app = Flask(__name__)
 CORS(app)  # Frontend'den gelen isteklere izin ver
 
-# Google API yetki alanları
+# Google Sheets yetkileri
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# 🔑 Google kimlik bilgilerini al
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -22,7 +21,6 @@ def get_creds():
     creds_dict = json.loads(creds_json)
     return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 
-# 📊 Google Sheets bağlantısı
 def get_sheet():
     creds = get_creds()
     client = gspread.authorize(creds)
@@ -32,6 +30,7 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
+# ImgBB yükleme fonksiyonu (debug loglu)
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -39,16 +38,16 @@ def upload_to_imgbb(base64_data, file_name):
             raise Exception("IMGBB_API_KEY bulunamadı.")
 
         if not base64_data.startswith("data:image"):
-            print("⚠️ Geçersiz resim formatı atlandı.")
+            print("⚠️ Geçersiz resim formatı:", base64_data[:30])
             return None
 
         if "," not in base64_data:
             print("⚠️ Base64 verisi hatalı:", base64_data[:50])
             return None
 
+        # Sadece base64 kısmını al
         image_bytes = base64_data.split(",")[1]
-        print("Base64 uzunluğu:", len(image_bytes))
-        print("Gönderilecek file_name:", file_name)
+        print(f"📌 Upload: {file_name}, Base64 uzunluğu: {len(image_bytes)}")
 
         payload = {
             "key": api_key,
@@ -74,9 +73,7 @@ def upload_to_imgbb(base64_data, file_name):
         traceback.print_exc()
         return None
 
-
-
-# 📥 API: Sheets'e verileri kaydet
+# API: Google Sheets’e veri kaydet
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
@@ -107,10 +104,10 @@ def kaydet():
 
         return jsonify({"mesaj": "Veriler başarıyla eklendi!"}), 200
 
-    except Exception as e:
+    except Exception:
         print("❌ Genel hata:")
         traceback.print_exc()
-        return jsonify({"hata": str(e)}), 500
+        return jsonify({"hata": "Sunucu hatası"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
