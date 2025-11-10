@@ -7,14 +7,14 @@ import os
 import base64
 import requests
 import traceback
-import time  # <-- benzersiz isim için ekledik
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Frontend'den gelen isteklere izin ver
 
 # Google API yetki alanları
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
+# 🔑 Google kimlik bilgilerini al
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -22,6 +22,7 @@ def get_creds():
     creds_dict = json.loads(creds_json)
     return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 
+# 📊 Google Sheets bağlantısı
 def get_sheet():
     creds = get_creds()
     client = gspread.authorize(creds)
@@ -31,6 +32,7 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
+# 📸 ImgBB'ye fotoğraf yükle
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -39,6 +41,10 @@ def upload_to_imgbb(base64_data, file_name):
 
         if not base64_data.startswith("data:image"):
             print("⚠️ Geçersiz resim formatı atlandı.")
+            return None
+
+        if "," not in base64_data:
+            print("⚠️ Base64 verisi hatalı:", base64_data[:50])
             return None
 
         image_bytes = base64_data.split(",")[1]
@@ -55,7 +61,9 @@ def upload_to_imgbb(base64_data, file_name):
 
         data = response.json()
         if data.get("success"):
-            return data["data"]["url"]
+            file_url = data["data"]["url"]
+            print(f"✅ Fotoğraf yüklendi: {file_url}")
+            return file_url
         else:
             print("🚨 ImgBB Error:", data.get("error", {}).get("message"))
             return None
@@ -65,6 +73,7 @@ def upload_to_imgbb(base64_data, file_name):
         traceback.print_exc()
         return None
 
+# 📥 API: Sheets'e verileri kaydet
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
@@ -84,8 +93,7 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                timestamp = int(time.time() * 1000)  # milisaniye damgası
-                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{timestamp}"
+                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{int(os.times()[4]*1000)}"  # unique isim
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
             if aciklama or personel or foto_url:
