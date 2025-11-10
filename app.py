@@ -1,104 +1,57 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import gspread
-from google.oauth2.service_account import Credentials
-import json
 import os
-import base64
 import requests
 import traceback
 
 app = Flask(__name__)
-CORS(app)  # Frontend'den gelen isteklere izin ver
+CORS(app)
 
-# Google API yetki alanları
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+# 🔑 ImgBB API key’i environment variable’dan al
+IMGBB_API_KEY = os.getenv("IMGBB_API_KEY")
 
-# 🔑 Google kimlik bilgilerini al
-def get_creds():
-    creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
-    if not creds_json:
-        raise Exception("GOOGLE_SHEETS_CREDENTIALS_JSON bulunamadı.")
-    creds_dict = json.loads(creds_json)
-    return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+if not IMGBB_API_KEY:
+    raise Exception("IMGBB_API_KEY environment variable bulunamadı!")
 
-# 📊 Google Sheets bağlantısı
-def get_sheet():
-    creds = get_creds()
-    client = gspread.authorize(creds)
-    spreadsheet_id = os.environ.get("SPREADSHEET_ID")
-    if not spreadsheet_id:
-        raise Exception("SPREADSHEET_ID bulunamadı.")
-    sh = client.open_by_key(spreadsheet_id)
-    return sh.worksheet("Sayfa1")
-
-# 📸 ImgBB'ye fotoğraf yükle
-def upload_to_imgbb(base64_data, file_name):
-    try:
-        api_key = os.environ.get("IMGBB_API_KEY")
-        if not api_key:
-            raise Exception("IMGBB_API_KEY bulunamadı.")
-
-        if "," not in base64_data:
-            print("⚠️ Base64 format hatası:", base64_data[:30])
-            return None
-
-        image_bytes = base64_data.split(",")[1]  # sadece saf base64
-
-        files = {"image": image_bytes}
-        data = {"key": api_key, "name": file_name}
-
-        response = requests.post("https://api.imgbb.com/1/upload", files=files, data=data)
-        result = response.json()
-
-        if result.get("success"):
-            file_url = result["data"]["url"]
-            print(f"✅ Fotoğraf yüklendi: {file_url}")
-            return file_url
-        else:
-            print("🚨 ImgBB Upload Error:", result.get("error", {}).get("message"))
-            return None
-
-    except Exception:
-        print("🚨 Fotoğraf yüklenemedi:")
-        traceback.print_exc()
-        return None
-
-# 📥 API: Sheets'e verileri kaydet
-@app.route("/api/kaydet", methods=["POST"])
-def kaydet():
+# 📸 Fotoğraf yükleme endpoint’i
+@app.route("/api/upload", methods=["POST"])
+def upload():
     try:
         data = request.get_json()
-        tarih = data.get("tarih")
-        vardiya = data.get("vardiya")
-        hat = data.get("hat")
-        aciklamalar = data.get("aciklamalar", [])
+        base64_image = data.get("foto", "")
+        file_name = data.get("name", "test_image")
 
-        ws = get_sheet()
-        rows_to_add = []
+        if not base64_image.startswith("data:image"):
+            return jsonify({"error": "Geçersiz base64 formatı"}), 400
 
-        for i, item in enumerate(aciklamalar):
-            aciklama = item.get("aciklama", "").strip()
-            personel = item.get("personel", "").strip()
-            foto_data = item.get("foto", "")
+        # Saf base64 kısmını al
+        if "," not in base64_image:
+            return jsonify({"error": "Base64 verisi hatalı"}), 400
 
-            foto_url = ""
-            if foto_data:
-                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}"
-                foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
+        image_bytes = base64_image.split(",")[1]
+        print("Base64 uzunluğu:", len(image_bytes))
+        print("Payload gönderiliyor...")
 
-            if aciklama or personel or foto_url:
-                rows_to_add.append([tarih, vardiya, hat, aciklama, personel, foto_url])
+        payload = {
+            "key": IMGBB_API_KEY,
+            "image": image_bytes,
+            "name": file_name
+        }
 
-        if rows_to_add:
-            ws.append_rows(rows_to_add, value_input_option="RAW")
+        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
+        print("Status code:", response.status_code)
+        print("Response:", response.text)
 
-        return jsonify({"mesaj": "Veriler başarıyla eklendi!"}), 200
+        result = response.json()
+        if result.get("success"):
+            return jsonify({"url": result["data"]["url"]})
+        else:
+            return jsonify({"error": result.get("error", {}).get("message", "Bilinmeyen hata")}), 400
 
-    except Exception as e:
-        print("❌ Genel hata:")
+    except Exception:
+        print("🚨 Upload sırasında hata:")
         traceback.print_exc()
-        return jsonify({"hata": str(e)}), 500
+        return jsonify({"error": "Sunucu hatası"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
