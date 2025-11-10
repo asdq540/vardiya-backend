@@ -2,23 +2,18 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 import io
 import json
 import os
 import base64
-from datetime import datetime
+import requests
 import traceback
 
 app = Flask(__name__)
 CORS(app)  # Frontend'den gelen isteklere izin ver
 
 # Google API yetki alanları
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 # 🔑 Google kimlik bilgilerini al
 def get_creds():
@@ -38,47 +33,34 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# 📸 Google Drive'a fotoğraf yükle
-def upload_to_drive(base64_data, file_name):
+# 📸 ImgBB'ye fotoğraf yükle
+def upload_to_imgbb(base64_data, file_name):
     try:
+        api_key = os.environ.get("IMGBB_API_KEY")
+        if not api_key:
+            raise Exception("IMGBB_API_KEY bulunamadı.")
+
         if not base64_data.startswith("data:image"):
             print("⚠️ Geçersiz resim formatı atlandı.")
             return None
 
-        creds = get_creds()
-        drive_service = build("drive", "v3", credentials=creds)
-
-        folder_id = os.environ.get("DRIVE_FOLDER_ID")
-        if not folder_id:
-            raise Exception("DRIVE_FOLDER_ID ortam değişkeni bulunamadı.")
-
-        file_bytes = base64.b64decode(base64_data.split(",")[1])
-        file_stream = io.BytesIO(file_bytes)
-
-        file_metadata = {
-            "name": file_name,
-            "parents": [folder_id]
+        image_bytes = base64_data.split(",")[1]  # "data:image/jpeg;base64,..."
+        payload = {
+            "key": api_key,
+            "image": image_bytes,
+            "name": file_name
         }
 
-        media = MediaIoBaseUpload(file_stream, mimetype="image/jpeg")
+        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
+        data = response.json()
 
-        file = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id"
-        ).execute()
-
-        file_id = file.get("id")
-
-        # 🔓 Dosyayı herkesle paylaş
-        drive_service.permissions().create(
-            fileId=file_id,
-            body={"role": "reader", "type": "anyone"}
-        ).execute()
-
-        file_url = f"https://drive.google.com/uc?id={file_id}"
-        print(f"✅ Fotoğraf yüklendi: {file_url}")
-        return file_url
+        if data["success"]:
+            file_url = data["data"]["url"]  # veya display_url
+            print(f"✅ Fotoğraf yüklendi: {file_url}")
+            return file_url
+        else:
+            print("🚨 ImgBB Upload Error:", data["error"]["message"])
+            return None
 
     except Exception as e:
         print("🚨 Fotoğraf yüklenemedi:")
@@ -105,8 +87,8 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}.jpg"
-                foto_url = upload_to_drive(foto_data, file_name) or "Fotoğraf yüklenemedi"
+                file_name = f"{tarih}_{vardiya}_{hat}_{i+1}"
+                foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
             # Boş olmayan satırları ekle
             if aciklama or personel or foto_url:
@@ -121,7 +103,6 @@ def kaydet():
         print("❌ Genel hata:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
