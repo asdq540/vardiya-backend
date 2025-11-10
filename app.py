@@ -32,37 +32,49 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# 📸 ImgBB'ye fotoğraf yükle
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
         if not api_key:
             raise Exception("IMGBB_API_KEY bulunamadı.")
 
-        if "," not in base64_data:
-            print("⚠️ Base64 format hatası:", base64_data[:30])
+        if not base64_data.startswith("data:image"):
+            print("⚠️ Geçersiz resim formatı atlandı.")
             return None
 
-        image_bytes = base64_data.split(",")[1]  # sadece saf base64
+        # Saf base64 al
+        if "," not in base64_data:
+            print("⚠️ Base64 verisi hatalı:", base64_data[:50])
+            return None
 
-        files = {"image": image_bytes}
-        data = {"key": api_key, "name": file_name}
+        image_bytes = base64_data.split(",")[1]
+        print("Base64 uzunluğu:", len(image_bytes))
+        print("Gönderilecek file_name:", file_name)
 
-        response = requests.post("https://api.imgbb.com/1/upload", files=files, data=data)
-        result = response.json()
+        payload = {
+            "key": api_key,
+            "image": image_bytes,
+            "name": file_name
+        }
 
-        if result.get("success"):
-            file_url = result["data"]["url"]
+        response = requests.post("https://api.imgbb.com/1/upload", data=payload)
+        print("Status code:", response.status_code)
+        print("Response text:", response.text)
+
+        data = response.json()
+        if data["success"]:
+            file_url = data["data"]["url"]
             print(f"✅ Fotoğraf yüklendi: {file_url}")
             return file_url
         else:
-            print("🚨 ImgBB Upload Error:", result.get("error", {}).get("message"))
+            print("🚨 ImgBB Error:", data.get("error", {}).get("message"))
             return None
 
-    except Exception:
+    except Exception as e:
         print("🚨 Fotoğraf yüklenemedi:")
         traceback.print_exc()
         return None
+
 
 # 📥 API: Sheets'e verileri kaydet
 @app.route("/api/kaydet", methods=["POST"])
