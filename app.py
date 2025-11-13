@@ -56,20 +56,17 @@ def upload_to_imgbb(base64_data, file_name):
         return None
 
 
-# ✅ Ana API endpoint: Google Sheets'e veri kaydetme
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
         data = request.get_json()
-
         tarih = data.get("tarih")
         vardiya = data.get("vardiya")
         hat = data.get("hat")
-        kalite_personeli = data.get("kalitePersoneli", "").strip()  # ✅ yeni alan
         aciklamalar = data.get("aciklamalar", [])
+        kalite_personeli = data.get("kalitePersoneli", "")
 
         ws = get_sheet()
-        rows_to_add = []
 
         for i, item in enumerate(aciklamalar):
             aciklama = item.get("aciklama", "").strip()
@@ -78,25 +75,16 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                # ✅ benzersiz isim üretimi
                 file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{int(os.times()[4]*1000)}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
-            # ✅ Boş olmayan satırları ekle
-            if aciklama or personel or foto_url:
-                rows_to_add.append([
-                    tarih,            # A
-                    vardiya,          # B
-                    hat,              # C
-                    aciklama,         # D
-                    personel,         # E
-                    foto_url,         # F
-                    kalite_personeli  # G
+            # Boş satır kontrolü
+            if aciklama or personel or foto_url or kalite_personeli:
+                # Son dolu satır +1
+                row_index = len(ws.get_all_values()) + 1
+                ws.update(f"A{row_index}:G{row_index}", [
+                    [tarih, vardiya, hat, aciklama, personel, foto_url, kalite_personeli]
                 ])
-
-        # ✅ Google Sheet'e toplu ekleme
-        if rows_to_add:
-            ws.append_rows(rows_to_add, value_input_option="RAW")
 
         return jsonify({"mesaj": "Veriler başarıyla eklendi!"}), 200
 
@@ -104,6 +92,7 @@ def kaydet():
         print("❌ Genel hata:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
+
 
 
 # ✅ Ana uygulama başlatma
