@@ -9,7 +9,7 @@ CORS(app)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Google Sheets kimlik doğrulama
+# ✅ Google Sheets kimlik doğrulama
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -26,7 +26,7 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# ImgBB yükleme
+# ✅ ImgBB yükleme fonksiyonu
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -55,14 +55,17 @@ def upload_to_imgbb(base64_data, file_name):
         traceback.print_exc()
         return None
 
-# API endpoint: veri kaydet
+
+# ✅ Ana API endpoint: Google Sheets'e veri kaydetme
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
         data = request.get_json()
+
         tarih = data.get("tarih")
         vardiya = data.get("vardiya")
         hat = data.get("hat")
+        kalite_personeli = data.get("kalitePersoneli", "").strip()  # ✅ yeni alan
         aciklamalar = data.get("aciklamalar", [])
 
         ws = get_sheet()
@@ -75,13 +78,23 @@ def kaydet():
 
             foto_url = ""
             if foto_data:
-                # benzersiz isim: tarih_vardiya_hat_index_random
+                # ✅ benzersiz isim üretimi
                 file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{int(os.times()[4]*1000)}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
+            # ✅ Boş olmayan satırları ekle
             if aciklama or personel or foto_url:
-                rows_to_add.append([tarih, vardiya, hat, aciklama, personel, foto_url])
+                rows_to_add.append([
+                    tarih,            # A
+                    vardiya,          # B
+                    hat,              # C
+                    aciklama,         # D
+                    personel,         # E
+                    foto_url,         # F
+                    kalite_personeli  # G
+                ])
 
+        # ✅ Google Sheet'e toplu ekleme
         if rows_to_add:
             ws.append_rows(rows_to_add, value_input_option="RAW")
 
@@ -92,6 +105,8 @@ def kaydet():
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
 
+
+# ✅ Ana uygulama başlatma
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
