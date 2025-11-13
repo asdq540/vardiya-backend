@@ -94,7 +94,10 @@ def kaydet():
         return jsonify({"hata": str(e)}), 500
 
 
-
+@app.route("/health")
+def health():
+    return "OK", 200
+    
 # ✅ Ana uygulama başlatma
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
