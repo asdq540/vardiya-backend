@@ -196,8 +196,13 @@ def sil():
 def get_data():
     try:
         ws = get_sheet()
-        all_values = ws.get_all_values()  # saf array
-        return jsonify(all_values), 200
+        all_values = ws.get_all_values()
+
+        # tüm satırları eşit uzunlukta yap
+        max_cols = max(len(row) for row in all_values)
+        full_rows = [row + [""]*(max_cols - len(row)) for row in all_values]
+
+        return jsonify(full_rows), 200
     except Exception as e:
         print("❌ Veri çekme hatası:")
         traceback.print_exc()
