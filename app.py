@@ -198,22 +198,31 @@ def get_data():
         ws = get_sheet()
         all_values = ws.get_all_values()
 
-        # her satırın uzunluğunu en az 15’e tamamla
-        full_rows = [row + [""]*(15 - len(row)) if len(row) < 15 else row for row in all_values]
+        # Başlık satırı
+        header_row = all_values[0]
 
-        # kolonları ayır
-        data_rows = [r[9:15] for r in full_rows]   # J-O (0-indexli, J=9, O=14)
-        photo_rows = [r[0:7] for r in full_rows]   # A-G
+        # Veri satırları (başlık satırı hariç)
+        full_rows = all_values[1:]
+
+        # Data tablosu: J-O (0-index 9-14)
+        data_header = header_row[9:15]
+        data_rows = [r[9:15] for r in full_rows]
+
+        # Fotoğraf tablosu: A-G (0-6)
+        photo_header = header_row[0:7]
+        photo_rows = [r[0:7] for r in full_rows]
 
         return jsonify({
-            "data": data_rows,
-            "photos": photo_rows
+            "dataHeader": data_header,
+            "dataRows": data_rows,
+            "photoHeader": photo_header,
+            "photoRows": photo_rows
         }), 200
+
     except Exception as e:
         print("❌ Veri çekme hatası:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
-
 
 
 
