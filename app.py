@@ -12,8 +12,8 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 # ------------------------------------------
 # SABİT KULLANICI (login)
 # ------------------------------------------
-VALID_USERNAME = os.environ.get("APP_USERNAME", "admin")
-VALID_PASSWORD = os.environ.get("APP_PASSWORD", "1234")
+VALID_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+VALID_PASSWORD = os.environ.get("ADMIN_PASSWORD", "1234")
 
 
 # ------------------------------------------
@@ -190,20 +190,28 @@ def sil():
 
 
 # ---------------------------------------------------------
-# ✔ VERİ ÇEKME
+# ✔ VERİ ÇEKME API (RAW JSON)
 # ---------------------------------------------------------
 @app.route("/api/get", methods=["GET"])
 def get_data():
-    if not check_auth():
-        return jsonify({"hata": "Yetkisiz erişim"}), 401
     try:
         ws = get_sheet()
-        records = ws.get_all_records()
+        all_values = ws.get_all_values()
+        if not all_values:
+            return jsonify([]), 200
+
+        header = all_values[0]  # 1. satır başlık
+        data_rows = all_values[1:]  # geri kalan satırlar
+
+        # JSON oluştur
+        records = [dict(zip(header, row)) for row in data_rows]
         return jsonify(records), 200
+
     except Exception as e:
         print("❌ Veri çekme hatası:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
+
 
 
 # ---------------------------------------------------------
