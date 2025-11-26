@@ -163,6 +163,20 @@ def sil():
 @app.route("/health")
 def health():
     return "OK", 200
+    # ---------------------------------------------------------
+# ✔ VERİ ÇEKME API
+# ---------------------------------------------------------
+@app.route("/api/get", methods=["GET"])
+def get_data():
+    try:
+        ws = get_sheet()
+        records = ws.get_all_records()  # sütun isimlerini key olarak alır
+        return jsonify(records), 200
+    except Exception as e:
+        print("❌ Veri çekme hatası:")
+        traceback.print_exc()
+        return jsonify({"hata": str(e)}), 500
+
 
 
 # ---------------------------------------------------------
