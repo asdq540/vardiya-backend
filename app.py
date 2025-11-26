@@ -205,11 +205,11 @@ def get_data():
         full_rows = all_values[1:]
 
         # Data tablosu: J-O (0-index 9-14)
-        data_header = header_row[9:15]
+        data_header = header_row[9:14]
         data_rows = [r[9:15] for r in full_rows]
 
         # Fotoğraf tablosu: A-G (0-6)
-        photo_header = header_row[0:7]
+        photo_header = header_row[0:6]
         photo_rows = [r[0:7] for r in full_rows]
 
         return jsonify({
