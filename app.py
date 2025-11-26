@@ -10,6 +10,13 @@ CORS(app)
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 # ------------------------------------------
+# SABİT KULLANICI (login)
+# ------------------------------------------
+VALID_USERNAME = os.environ.get("APP_USERNAME", "admin")
+VALID_PASSWORD = os.environ.get("APP_PASSWORD", "1234")
+
+
+# ------------------------------------------
 # GOOGLE SHEETS BAĞLANTI
 # ------------------------------------------
 def get_creds():
@@ -27,6 +34,7 @@ def get_sheet():
         raise Exception("SPREADSHEET_ID bulunamadı.")
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
+
 
 # ------------------------------------------
 # ImgBB FOTOĞRAF UPLOAD
@@ -60,11 +68,36 @@ def upload_to_imgbb(base64_data, file_name):
         return None
 
 
+# ------------------------------------------
+# LOGIN
+# ------------------------------------------
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+    if username == VALID_USERNAME and password == VALID_PASSWORD:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"success": False, "message": "Kullanıcı adı veya şifre yanlış"}), 401
+
+
+# ------------------------------------------
+# LOGIN KONTROL FONKSİYONU
+# ------------------------------------------
+def check_auth():
+    # frontend localStorage ile login kontrolü yapıyor, backend basit tutalım
+    # isteğe bağlı: burada token veya session kontrolü ekleyebilirsin
+    return True
+
+
 # ---------------------------------------------------------
-# ✔ VERİ EKLEME (MEVCUT)
+# ✔ VERİ EKLEME
 # ---------------------------------------------------------
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
+    if not check_auth():
+        return jsonify({"hata": "Yetkisiz erişim"}), 401
     try:
         data = request.get_json()
         tarih = data.get("tarih")
@@ -98,31 +131,20 @@ def kaydet():
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
 
-# ✔ VERİ ÇEKME API
+
 # ---------------------------------------------------------
-@app.route("/api/get", methods=["GET"])
-def get_data():
-    try:
-        ws = get_sheet()
-        records = ws.get_all_records()  # sütun isimlerini key olarak alır
-        return jsonify(records), 200
-    except Exception as e:
-        print("❌ Veri çekme hatası:")
-        traceback.print_exc()
-        return jsonify({"hata": str(e)}), 500
-# ---------------------------------------------------------
-# ✔ VERİ DÜZENLEME API
+# ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
+    if not check_auth():
+        return jsonify({"hata": "Yetkisiz erişim"}), 401
     try:
         data = request.get_json()
-        row = int(data.get("row"))      # Düzenlenecek satır
-        yeni = data.get("yeni")         # { tarih, vardiya, hat, aciklama, personel, foto, kalitePersoneli }
-
+        row = int(data.get("row"))
+        yeni = data.get("yeni")
         ws = get_sheet()
 
-        # Fotoğraf yeniden yükleniyorsa yeni URL üret
         foto_url = yeni.get("foto_url", "")
         foto_base64 = yeni.get("foto_base64", "")
 
@@ -149,21 +171,37 @@ def duzenle():
 
 
 # ---------------------------------------------------------
-# ✔ VERİ SİLME API
+# ✔ VERİ SİLME
 # ---------------------------------------------------------
 @app.route("/api/sil", methods=["POST"])
 def sil():
+    if not check_auth():
+        return jsonify({"hata": "Yetkisiz erişim"}), 401
     try:
         data = request.get_json()
         row = int(data.get("row"))
-
         ws = get_sheet()
         ws.delete_rows(row)
-
         return jsonify({"mesaj": "Satır silindi."}), 200
-
     except Exception as e:
         print("❌ Silme hatası:")
+        traceback.print_exc()
+        return jsonify({"hata": str(e)}), 500
+
+
+# ---------------------------------------------------------
+# ✔ VERİ ÇEKME
+# ---------------------------------------------------------
+@app.route("/api/get", methods=["GET"])
+def get_data():
+    if not check_auth():
+        return jsonify({"hata": "Yetkisiz erişim"}), 401
+    try:
+        ws = get_sheet()
+        records = ws.get_all_records()
+        return jsonify(records), 200
+    except Exception as e:
+        print("❌ Veri çekme hatası:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
 
@@ -174,9 +212,6 @@ def sil():
 @app.route("/health")
 def health():
     return "OK", 200
-    # ---------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------
