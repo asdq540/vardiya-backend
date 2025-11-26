@@ -9,7 +9,9 @@ CORS(app)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# ✅ Google Sheets kimlik doğrulama
+# ------------------------------------------
+# GOOGLE SHEETS BAĞLANTI
+# ------------------------------------------
 def get_creds():
     creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
     if not creds_json:
@@ -26,7 +28,9 @@ def get_sheet():
     sh = client.open_by_key(spreadsheet_id)
     return sh.worksheet("Sayfa1")
 
-# ✅ ImgBB yükleme fonksiyonu
+# ------------------------------------------
+# ImgBB FOTOĞRAF UPLOAD
+# ------------------------------------------
 def upload_to_imgbb(base64_data, file_name):
     try:
         api_key = os.environ.get("IMGBB_API_KEY")
@@ -56,6 +60,9 @@ def upload_to_imgbb(base64_data, file_name):
         return None
 
 
+# ---------------------------------------------------------
+# ✔ VERİ EKLEME (MEVCUT)
+# ---------------------------------------------------------
 @app.route("/api/kaydet", methods=["POST"])
 def kaydet():
     try:
@@ -78,9 +85,7 @@ def kaydet():
                 file_name = f"{tarih}_{vardiya}_{hat}_{i+1}_{int(os.times()[4]*1000)}"
                 foto_url = upload_to_imgbb(foto_data, file_name) or "Fotoğraf yüklenemedi"
 
-            # Boş satır kontrolü
             if aciklama or personel or foto_url or kalite_personeli:
-                # Son dolu satır +1
                 row_index = len(ws.get_all_values()) + 1
                 ws.update(f"A{row_index}:G{row_index}", [
                     [tarih, vardiya, hat, aciklama, personel, foto_url, kalite_personeli]
@@ -94,11 +99,75 @@ def kaydet():
         return jsonify({"hata": str(e)}), 500
 
 
+# ---------------------------------------------------------
+# ✔ VERİ DÜZENLEME API
+# ---------------------------------------------------------
+@app.route("/api/duzenle", methods=["POST"])
+def duzenle():
+    try:
+        data = request.get_json()
+        row = int(data.get("row"))      # Düzenlenecek satır
+        yeni = data.get("yeni")         # { tarih, vardiya, hat, aciklama, personel, foto, kalitePersoneli }
+
+        ws = get_sheet()
+
+        # Fotoğraf yeniden yükleniyorsa yeni URL üret
+        foto_url = yeni.get("foto_url", "")
+        foto_base64 = yeni.get("foto_base64", "")
+
+        if foto_base64:
+            file_name = f"edit_{row}_{int(os.times()[4]*1000)}"
+            foto_url = upload_to_imgbb(foto_base64, file_name) or foto_url
+
+        ws.update(f"A{row}:G{row}", [[
+            yeni.get("tarih", ""),
+            yeni.get("vardiya", ""),
+            yeni.get("hat", ""),
+            yeni.get("aciklama", ""),
+            yeni.get("personel", ""),
+            foto_url,
+            yeni.get("kalitePersoneli", "")
+        ]])
+
+        return jsonify({"mesaj": "Satır başarıyla güncellendi.", "foto_url": foto_url}), 200
+
+    except Exception as e:
+        print("❌ Düzenleme hatası:")
+        traceback.print_exc()
+        return jsonify({"hata": str(e)}), 500
+
+
+# ---------------------------------------------------------
+# ✔ VERİ SİLME API
+# ---------------------------------------------------------
+@app.route("/api/sil", methods=["POST"])
+def sil():
+    try:
+        data = request.get_json()
+        row = int(data.get("row"))
+
+        ws = get_sheet()
+        ws.delete_rows(row)
+
+        return jsonify({"mesaj": "Satır silindi."}), 200
+
+    except Exception as e:
+        print("❌ Silme hatası:")
+        traceback.print_exc()
+        return jsonify({"hata": str(e)}), 500
+
+
+# ---------------------------------------------------------
+# ✔ HEALTH CHECK
+# ---------------------------------------------------------
 @app.route("/health")
 def health():
     return "OK", 200
-    
-# ✅ Ana uygulama başlatma
+
+
+# ---------------------------------------------------------
+# ✔ SERVER BAŞLATMA
+# ---------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
