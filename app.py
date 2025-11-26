@@ -196,17 +196,8 @@ def sil():
 def get_data():
     try:
         ws = get_sheet()
-        all_values = ws.get_all_values()
-        if not all_values:
-            return jsonify([]), 200
-
-        header = all_values[0]  # 1. satır başlık
-        data_rows = all_values[1:]  # geri kalan satırlar
-
-        # JSON oluştur
-        records = [dict(zip(header, row)) for row in data_rows]
-        return jsonify(records), 200
-
+        all_values = ws.get_all_values()  # saf array
+        return jsonify(all_values), 200
     except Exception as e:
         print("❌ Veri çekme hatası:")
         traceback.print_exc()
