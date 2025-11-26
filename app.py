@@ -198,19 +198,27 @@ def get_data():
         ws = get_sheet()
         all_values = ws.get_all_values()
 
-        # Başlık satırı
+        if not all_values or len(all_values) < 2:
+            return jsonify({
+                "dataHeader": [],
+                "dataRows": [],
+                "photoHeader": [],
+                "photoRows": []
+            }), 200
+
+        # İlk satır başlık
         header_row = all_values[0]
 
-        # Veri satırları (başlık satırı hariç)
+        # Veri satırları
         full_rows = all_values[1:]
 
         # Data tablosu: J-O (0-index 9-14)
-        data_header = header_row[9:14]
-        data_rows = [r[9:15] for r in full_rows]
+        data_header = header_row[9:15]
+        data_rows = [r[9:15] if len(r) >= 15 else r[9:] + ['']*(15-len(r)) for r in full_rows]
 
         # Fotoğraf tablosu: A-G (0-6)
-        photo_header = header_row[0:6]
-        photo_rows = [r[0:7] for r in full_rows]
+        photo_header = header_row[0:7]
+        photo_rows = [r[0:7] if len(r) >= 7 else r[0:] + ['']*(7-len(r)) for r in full_rows]
 
         return jsonify({
             "dataHeader": data_header,
