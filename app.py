@@ -136,16 +136,27 @@ def kaydet():
 # ---------------------------------------------------------
 # ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
+# Satır ID ile bulma fonksiyonu
+def find_row_by_id(ws, row_id):
+    """
+    H sütunundaki ID ile satır numarasını döner.
+    """
+    all_values = ws.get_all_values()
+    for idx, row in enumerate(all_values[1:], start=2):  # 1. satır başlık
+        if len(row) >= 8 and str(row[7]).strip() == str(row_id).strip():
+            return idx
+    return None
+
+
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
     try:
-        ws = get_sheet()  # SHEET yerine ws
+        ws = get_sheet()  # Sheet objesini al
         data = request.json
         row_id = data.get("id")
         if not row_id:
             return jsonify({"success": False, "message": "ID eksik"}), 400
 
-        # ID ile satırı bul
         row_number = find_row_by_id(ws, row_id)
         if not row_number:
             return jsonify({"success": False, "message": "ID bulunamadı"}), 404
@@ -156,7 +167,7 @@ def duzenle():
         vardiya = data.get("vardiya", "")
         hat = data.get("hat", "")
 
-        # Google Sheets update (örnek sütunlar: B=vardiya, C=hat, D=açıklama, E=personel)
+        # Google Sheets update
         ws.update(f"B{row_number}", vardiya)
         ws.update(f"C{row_number}", hat)
         ws.update(f"D{row_number}", aciklama)
@@ -164,7 +175,7 @@ def duzenle():
 
         return jsonify({"success": True})
     except Exception as e:
-        print("❌ Düzenleme hatası:")
+        print("❌ Güncelleme hatası:")
         traceback.print_exc()
         return jsonify({"success": False, "message": str(e)}), 500
 
