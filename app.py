@@ -132,9 +132,7 @@ def kaydet():
         return jsonify({"hata": str(e)}), 500
 
 
-# ---------------------------------------------------------
-# ✔ VERİ DÜZENLEME
-# ---------------------------------------------------------
+
 # ---------------------------------------------------------
 # ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
@@ -193,24 +191,6 @@ def sil():
         print("❌ Silme hatası:")
         traceback.print_exc()
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-# ---------------------------------------------------------
-# ✔ VERİ SİLME
-# ---------------------------------------------------------
-@app.route("/api/sil", methods=["POST"])
-def sil():
-    data = request.json
-    row_id = data.get("id")
-    if not row_id:
-        return jsonify({"success": False, "message": "ID eksik"}), 400
-
-    row_number = find_row_by_id(SHEET, row_id)
-    if not row_number:
-        return jsonify({"success": False, "message": "ID bulunamadı"}), 404
-
-    SHEET.delete_rows(row_number)
-    return jsonify({"success": True})
 
 
 
