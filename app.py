@@ -135,23 +135,13 @@ def kaydet():
 # ---------------------------------------------------------
 # ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
-@app.route("/api/duzenle", methods=["POST"])
-def duzenle():
-    data = request.get_json()
-    try:
-        row_index = int(data.get("rowIndex"))  # eski: data.get("row")
-        aciklama = data.get("aciklama", "")
-        personel = data.get("personel", "")
-        vardiya = data.get("vardiya", "")
-        hat = data.get("hat", "")
-        
-        # Burada Google Sheets güncelleme kodun devam eder
-        # Örnek: sheet.update_cell(row_index+2, col_index, value)
-        
-        return jsonify({"success": True})
-    except Exception as e:
-        print(e)
-        return jsonify({"success": False, "message": str(e)}), 500
+data = request.json
+row = data.get("rowIndex")
+if row is None:
+    return jsonify({"success": False, "message": "rowIndex eksik"}), 400
+row = int(row)
+# sonra Sheets güncelle
+
 
 
 
@@ -160,15 +150,19 @@ def duzenle():
 # ---------------------------------------------------------
 @app.route("/api/sil", methods=["POST"])
 def sil():
-    data = request.get_json()
+    data = request.json
+    row = data.get("rowIndex")
+    if row is None:
+        return jsonify({"success": False, "message": "rowIndex eksik"}), 400
+
     try:
-        row_index = int(data.get("rowIndex"))  # frontend ile uyumlu isim
-        # Google Sheets veya veri dizisinden silme işlemi
-        # Örnek: sheet.delete_row(row_index + 2)
+        row = int(row)
+        # Google Sheets silme işlemi burada yapılacak
+        # sheet.delete_row(row + 2) gibi (başlık + 1 tablodaki index + 1)
         return jsonify({"success": True})
     except Exception as e:
-        print(e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)})
+
 
 
 
