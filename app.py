@@ -215,9 +215,9 @@ def get_data():
         ]
 
         # Fotoğraf tablosu: A-H (0-7) -> ID artık dahil
-        photo_header = header_row[0:8]
+        photo_header = header_row[0:7]
         photo_rows = [
-            r[0:8] if len(r) >= 8 else r[0:] + ['']*(8-len(r))
+            r[0:7] if len(r) >= 7 else r[0:] + ['']*(7-len(r))
             for r in full_rows
         ]
 
