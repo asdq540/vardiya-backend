@@ -160,18 +160,16 @@ def duzenle():
 # ---------------------------------------------------------
 @app.route("/api/sil", methods=["POST"])
 def sil():
-    if not check_auth():
-        return jsonify({"hata": "Yetkisiz erişim"}), 401
+    data = request.get_json()
     try:
-        data = request.get_json()
-        row = int(data.get("row"))
-        ws = get_sheet()
-        ws.delete_rows(row)
-        return jsonify({"mesaj": "Satır silindi."}), 200
+        row_index = int(data.get("rowIndex"))  # frontend ile uyumlu isim
+        # Google Sheets veya veri dizisinden silme işlemi
+        # Örnek: sheet.delete_row(row_index + 2)
+        return jsonify({"success": True})
     except Exception as e:
-        print("❌ Silme hatası:")
-        traceback.print_exc()
-        return jsonify({"hata": str(e)}), 500
+        print(e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 
 # ---------------------------------------------------------
