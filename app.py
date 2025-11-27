@@ -135,45 +135,64 @@ def kaydet():
 # ---------------------------------------------------------
 # ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
-def find_row_by_id(ws, row_id):
-    """
-    Google Sheet üzerinde H sütununda (index 7) verilen ID'yi bulur ve satır numarasını döner.
-    ws: Worksheet objesi
-    row_id: aranacak ID
-    return: satır numarası (1-indexed), yoksa None
-    """
-    all_values = ws.get_all_values()
-    for idx, row in enumerate(all_values[1:], start=2):  # 1. satır başlık, 2-index start
-        if len(row) >= 8 and str(row[7]).strip() == str(row_id).strip():
-            return idx
-    return None
-
+# ---------------------------------------------------------
+# ✔ VERİ DÜZENLEME
+# ---------------------------------------------------------
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
-    data = request.json
-    row_id = data.get("id")
-    if not row_id:
-        return jsonify({"success": False, "message": "ID eksik"}), 400
+    try:
+        ws = get_sheet()  # SHEET yerine ws
+        data = request.json
+        row_id = data.get("id")
+        if not row_id:
+            return jsonify({"success": False, "message": "ID eksik"}), 400
 
-    # ID ile satırı bul
-    row_number = find_row_by_id(SHEET, row_id)
-    if not row_number:
-        return jsonify({"success": False, "message": "ID bulunamadı"}), 404
+        # ID ile satırı bul
+        row_number = find_row_by_id(ws, row_id)
+        if not row_number:
+            return jsonify({"success": False, "message": "ID bulunamadı"}), 404
 
-    # Güncellenecek değerler
-    aciklama = data.get("aciklama", "")
-    personel = data.get("personel", "")
-    vardiya = data.get("vardiya", "")
-    hat = data.get("hat", "")
+        # Güncellenecek değerler
+        aciklama = data.get("aciklama", "")
+        personel = data.get("personel", "")
+        vardiya = data.get("vardiya", "")
+        hat = data.get("hat", "")
 
-    # Google Sheets update (örnek sütunlar: B=vardiya, C=hat, D=açıklama, E=personel)
-    SHEET.update(f"B{row_number}", vardiya)
-    SHEET.update(f"C{row_number}", hat)
-    SHEET.update(f"D{row_number}", aciklama)
-    SHEET.update(f"E{row_number}", personel)
+        # Google Sheets update (örnek sütunlar: B=vardiya, C=hat, D=açıklama, E=personel)
+        ws.update(f"B{row_number}", vardiya)
+        ws.update(f"C{row_number}", hat)
+        ws.update(f"D{row_number}", aciklama)
+        ws.update(f"E{row_number}", personel)
 
-    return jsonify({"success": True})
+        return jsonify({"success": True})
+    except Exception as e:
+        print("❌ Düzenleme hatası:")
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
 
+
+# ---------------------------------------------------------
+# ✔ VERİ SİLME
+# ---------------------------------------------------------
+@app.route("/api/sil", methods=["POST"])
+def sil():
+    try:
+        ws = get_sheet()
+        data = request.json
+        row_id = data.get("id")
+        if not row_id:
+            return jsonify({"success": False, "message": "ID eksik"}), 400
+
+        row_number = find_row_by_id(ws, row_id)
+        if not row_number:
+            return jsonify({"success": False, "message": "ID bulunamadı"}), 404
+
+        ws.delete_rows(row_number)
+        return jsonify({"success": True})
+    except Exception as e:
+        print("❌ Silme hatası:")
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 # ---------------------------------------------------------
