@@ -151,7 +151,7 @@ def find_row_by_id(ws, row_id):
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
     try:
-        ws = get_sheet()  # Sheet objesini al
+        ws = get_sheet()
         data = request.json
         row_id = data.get("id")
         if not row_id:
@@ -167,11 +167,11 @@ def duzenle():
         vardiya = data.get("vardiya", "")
         hat = data.get("hat", "")
 
-        # Google Sheets update
-        ws.update(f"B{row_number}", vardiya)
-        ws.update(f"C{row_number}", hat)
-        ws.update(f"D{row_number}", aciklama)
-        ws.update(f"E{row_number}", personel)
+        # GSheet update (tek hücre için [[value]])
+        ws.update(f"B{row_number}", [[vardiya]])
+        ws.update(f"C{row_number}", [[hat]])
+        ws.update(f"D{row_number}", [[aciklama]])
+        ws.update(f"E{row_number}", [[personel]])
 
         return jsonify({"success": True})
     except Exception as e:
