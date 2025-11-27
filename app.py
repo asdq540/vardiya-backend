@@ -138,7 +138,7 @@ def kaydet():
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
     data = request.json
-    row_index = data.get("rowIndex")  # frontend’den gelen key
+    row_index = data.get("rowIndex")  # frontend’den gelen rowIndex
 
     if row_index is None:
         return jsonify({"success": False, "message": "rowIndex eksik"}), 400
@@ -146,14 +146,13 @@ def duzenle():
     try:
         row_index = int(row_index)
 
-        # Yeni değerler
         aciklama = data.get("aciklama", "")
         personel = data.get("personel", "")
         vardiya = data.get("vardiya", "")
         hat = data.get("hat", "")
 
-        # Google Sheets’deki satır numarası: tablo başlığı + 1 offset
-        sheet_row = row_index + 2  # başlık satırı var, index 0-based
+        # Google Sheets’deki satır numarası: başlık satırı + offset
+        sheet_row = row_index + 2  # başlık 1. satırda
 
         # Hücreleri güncelle
         sheet.update_cell(sheet_row, 2, vardiya)       # B sütunu
@@ -165,6 +164,7 @@ def duzenle():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 
 
