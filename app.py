@@ -138,32 +138,28 @@ def kaydet():
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
     data = request.json
-    row_index = data.get("rowIndex")  # frontend’den gelen rowIndex
+    row_id = data.get("id")
+    if not row_id:
+        return jsonify({"success": False, "message": "ID eksik"}), 400
 
-    if row_index is None:
-        return jsonify({"success": False, "message": "rowIndex eksik"}), 400
+    # ID ile satırı bul
+    row_number = find_row_by_id(SHEET, row_id)
+    if not row_number:
+        return jsonify({"success": False, "message": "ID bulunamadı"}), 404
 
-    try:
-        row_index = int(row_index)
+    # Güncellenecek değerler
+    aciklama = data.get("aciklama", "")
+    personel = data.get("personel", "")
+    vardiya = data.get("vardiya", "")
+    hat = data.get("hat", "")
 
-        aciklama = data.get("aciklama", "")
-        personel = data.get("personel", "")
-        vardiya = data.get("vardiya", "")
-        hat = data.get("hat", "")
+    # Google Sheets update (örnek sütunlar: B=vardiya, C=hat, D=açıklama, E=personel)
+    SHEET.update(f"B{row_number}", vardiya)
+    SHEET.update(f"C{row_number}", hat)
+    SHEET.update(f"D{row_number}", aciklama)
+    SHEET.update(f"E{row_number}", personel)
 
-        # Google Sheets’deki satır numarası: başlık satırı + offset
-        sheet_row = row_index + 2  # başlık 1. satırda
-
-        # Hücreleri güncelle
-        sheet.update_cell(sheet_row, 2, vardiya)       # B sütunu
-        sheet.update_cell(sheet_row, 3, hat)          # C sütunu
-        sheet.update_cell(sheet_row, 4, aciklama)     # D sütunu
-        sheet.update_cell(sheet_row, 5, personel)     # E sütunu
-
-        return jsonify({"success": True})
-
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+    return jsonify({"success": True})
 
 
 
@@ -174,17 +170,16 @@ def duzenle():
 @app.route("/api/sil", methods=["POST"])
 def sil():
     data = request.json
-    row = data.get("rowIndex")
-    if row is None:
-        return jsonify({"success": False, "message": "rowIndex eksik"}), 400
+    row_id = data.get("id")
+    if not row_id:
+        return jsonify({"success": False, "message": "ID eksik"}), 400
 
-    try:
-        row = int(row)
-        # Google Sheets silme işlemi burada yapılacak
-        # sheet.delete_row(row + 2) gibi (başlık + 1 tablodaki index + 1)
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+    row_number = find_row_by_id(SHEET, row_id)
+    if not row_number:
+        return jsonify({"success": False, "message": "ID bulunamadı"}), 404
+
+    SHEET.delete_rows(row_number)
+    return jsonify({"success": True})
 
 
 
