@@ -135,6 +135,19 @@ def kaydet():
 # ---------------------------------------------------------
 # ✔ VERİ DÜZENLEME
 # ---------------------------------------------------------
+def find_row_by_id(ws, row_id):
+    """
+    Google Sheet üzerinde H sütununda (index 7) verilen ID'yi bulur ve satır numarasını döner.
+    ws: Worksheet objesi
+    row_id: aranacak ID
+    return: satır numarası (1-indexed), yoksa None
+    """
+    all_values = ws.get_all_values()
+    for idx, row in enumerate(all_values[1:], start=2):  # 1. satır başlık, 2-index start
+        if len(row) >= 8 and str(row[7]).strip() == str(row_id).strip():
+            return idx
+    return None
+
 @app.route("/api/duzenle", methods=["POST"])
 def duzenle():
     data = request.json
@@ -160,7 +173,6 @@ def duzenle():
     SHEET.update(f"E{row_number}", personel)
 
     return jsonify({"success": True})
-
 
 
 
