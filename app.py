@@ -209,17 +209,11 @@ def get_data():
 
         # Data tablosu: J-O (0-index 9-14)
         data_header = header_row[9:15]
-        data_rows = [
-            r[9:15] if len(r) >= 15 else r[9:] + ['']*(15-len(r))
-            for r in full_rows
-        ]
+        data_rows = [r[9:15] if len(r) >= 15 else r[9:] + ['']*(15-len(r)) for r in full_rows]
 
-        # Fotoğraf tablosu: A-H (0-7) -> ID artık dahil
-        photo_header = header_row[0:7]
-        photo_rows = [
-            r[0:7] if len(r) >= 7 else r[0:] + ['']*(7-len(r))
-            for r in full_rows
-        ]
+        # Fotoğraf tablosu: A-H (0-7) — H sütunu ID için
+        photo_header = header_row[0:8]
+        photo_rows = [r[0:8] if len(r) >= 8 else r[0:] + ['']*(8-len(r)) for r in full_rows]
 
         return jsonify({
             "dataHeader": data_header,
@@ -232,7 +226,6 @@ def get_data():
         print("❌ Veri çekme hatası:")
         traceback.print_exc()
         return jsonify({"hata": str(e)}), 500
-
 
 
 
